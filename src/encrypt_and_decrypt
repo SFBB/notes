@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+
+import Crypto
+from Crypto.PublicKey import RSA
+from Crypto import Random
+from Crypto.Random import get_random_bytes
+from Crypto.Cipher import AES, PKCS1_OAEP
+import ast
+import base64
+import os
+import sys
+from handle_date import is_date, find_weekday, parse_date
+
+
+def auto_complete_date(date):
+    if len(date) == 8:
+        return date + find_weekday([int(date[:4]), int(date[4:6]), int(date[6:8])])
+    return date
+
+def remove_undiary(list):
+    first = "000000000"
+    now = os.popen("date +\'%Y%m%d%w\'").read()
+    index = list.copy()
+    for i in index:
+        if is_date(i):
+            if int(i) < int(first) or int(i) > int(now):
+                list.remove(i)
+        else:
+            list.remove(i)
+    return list
+
+def make_data(data_list):
+    result = ""
+    for data in data_list:
+        result += data + "\n"
+    result = result[:len(result)-1]
+    return result
+
+def get_data_list(data):
+    result = data.split("\n")
+    result = result[:len(result)-1]
+    return result
+
+def read_data(filename, type=0):
+    if type == 0:
+        file = open(filename, "r")
+        data = file.readlines()
+        file.close()
+        if len(data) < 5:
+            print("You have not written diarys on "+parse_date(filename[len(filename)-9:], "%w %m%d %Y"))
+            return None
+        data = data[4:]
+        result = ""
+        for i in data:
+            result += i
+    elif type == 1:
+        file = open(filename+".encrypt", "rb")
+        data = file.read()
+        file.close()
+        result = data
+    else:
+        file = open(filename, "rb")
+        data = file.read()
+        file.close()
+        result = data
+    return result
+
+def write_data(data, filename, type=0):
+    if type == 0 or type == 1:
+        file = open(filename, "r")
+        file_data = file.readlines()
+        file.close()
+        file_data = file_data[:4]
+        if type == 0:
+            file_data[3] = "\n"
+        else:
+            file_data[3] = "Encrypted\n"
+        file = open(filename, "w")
+        file.writelines(file_data)
+        file.close()
+    if type == 0:
+        file = open(filename, "a")
+        file.write(data)
+        file.close()
+        result = os.popen("rm "+filename+".encrypt").read()
+    elif type == 1:
+        file = open(filename+".encrypt", "wb")
+        for i in data:
+            file.write(i)
+        file.close()
+    elif type == 2:
+        file = open(filename, "wb")
+        for i in data:
+            file.write(i)
+        file.close()
+        result = os.popen("rm "+filename+".tar.gz").read()
+    else:
+        file = open(filename, "wb")
+        file.write(data)
+        file.close()
+
+def generate_and_save_key():
+    random_generator = Random.new().read
+    key = RSA.generate(4096, random_generator) #generate pub and priv key
+
+    key_file = open("src/secret_key", "wb")
+    key_file.write(key.exportKey())
+    key_file.close()
+
+    key_file = open("src/public_key", "wb")
+    key_file.write(key.publickey().exportKey())
+    key_file.close()
+
+    return "secret_key", "public_key"
+
+def get_key(filename):
+    try:
+        key_file = open(filename, "rb")
+    except:
+        print("No Key!")
+        exit()
+    key_info = key_file.read()
+    key_file.close()
+    key = RSA.importKey(key_info)
+    return key
+
+def encrypt(content, key, type=0):
+    if type == 0:
+        content = content.encode("utf-8")
+    session_key = get_random_bytes(32)
+
+    cipher_rsa = PKCS1_OAEP.new(key)
+    enc_session_key = cipher_rsa.encrypt(session_key)
+
+    cipher_aes = AES.new(session_key, AES.MODE_EAX)
+    ciphertext, tag = cipher_aes.encrypt_and_digest(content)
+
+    result = [enc_session_key, cipher_aes.nonce, tag, ciphertext]
+    all = bytes(0)
+    for i in result:
+        all += i
+    all = base64.b64encode(all)
+    result = [all]
+    return result
+
+def decrypt(content, key, type=0):
+    content = base64.b64decode(content)
+    key_size = key.size_in_bytes()
+    enc_session_key = content[:key_size]
+    content = content[key_size:]
+    nonce = content[:16]
+    content = content[16:]
+    tag = content[:16]
+    content = content[16:]
+    ciphertext = content
+    cipher_rsa = PKCS1_OAEP.new(key)
+    session_key = cipher_rsa.decrypt(enc_session_key)
+
+    cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
+    result = cipher_aes.decrypt_and_verify(content, tag)
+
+    if type == 0:
+        return result.decode("utf-8")
+    else:
+        return result
+
+if __name__ == "__main__":
+    argvs = sys.argv
+    argvs = argvs[1:]
+    if len(argvs) == 1:
+        diarys = os.popen("ls diarys").read().split("\n")
+        diarys = remove_undiary(diarys)
+        argvs.extend(diarys)
+
+    if argvs[0] == "-e":
+        argvs = argvs[1:]
+        for argv in argvs:
+            argv = auto_complete_date(argv)
+            result_1 = os.popen("ls diarys/"+argv+".encrypt > /dev/null 2>&1 ; echo $?").read()
+            result_1 = result_1.replace("\n", "", result_1.count("\n"))
+            result_2 = os.popen("ls diarys/"+argv+" > /dev/null 2>&1 ; echo $?").read()
+            result_2 = result_2.replace("\n", "", result_2.count("\n"))
+            if result_1 != "0" and result_2 == "0":
+                if read_data("diarys/"+argv) != None:
+                    encrypted_data = encrypt(read_data("diarys/"+argv), get_key("src/public_key"))
+                    write_data(encrypted_data, "diarys/"+argv, 1)
+                    result = os.popen("cd res/"+argv+" > /dev/null 2>&1 ; echo $?").read()
+                    result = result.replace("\n", "", result.count("\n"))
+                    if result == "0":
+                        result = os.popen("cd res && tar -cvzf "+argv+".tar.gz "+argv).read()
+                        result = os.popen("rm -fr res/"+argv).read()
+                        encrypted_data = encrypt(read_data("res/"+argv+".tar.gz", 2), get_key("src/public_key"), 2)
+                        write_data(encrypted_data, "res/"+argv, 2)
+    elif argvs[0] == "-d":
+        argvs = argvs[1:]
+        for argv in argvs:
+            argv = auto_complete_date(argv)
+            result_1 = os.popen("ls diarys/"+argv+".encrypt > /dev/null 2>&1 ; echo $?").read()
+            result_1 = result_1.replace("\n", "", result_1.count("\n"))
+            result_2 = os.popen("ls diarys/"+argv+" > /dev/null 2>&1 ; echo $?").read()
+            result_2 = result_2.replace("\n", "", result_2.count("\n"))
+            if result_1 == "0" and result_2 == "0":
+                decrypted_data = decrypt(read_data("diarys/"+argv, 1), get_key("src/secret_key"))
+                write_data(decrypted_data, "diarys/"+argv)
+                result_1 = os.popen("cd res/"+argv+" > /dev/null 2>&1 ; echo $?").read()
+                result_1 = result_1.replace("\n", "", result_1.count("\n"))
+                result_2 = os.popen("ls res/"+argv+" > /dev/null 2>&1 ; echo $?").read()
+                result_2 = result_2.replace("\n", "", result_2.count("\n"))
+                if result_1 != "0" and result_2 == "0":
+                    decrypted_data = decrypt(read_data("res/"+argv, 2), get_key("src/secret_key"), 2)
+                    write_data(decrypted_data, "res/"+argv+".tar.gz", 3)
+                    result = os.popen("rm res/"+argv).read()
+                    result = os.popen("cd res && tar -xvf "+argv+".tar.gz && rm "+argv+".tar.gz").read()
+    elif argvs[0] == "--generate":
+        print(generate_and_save_key())

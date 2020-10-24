@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+from getpass import getpass
+
+
+argvs = sys.argv
+argvs = argvs[1:]
+check = 0
+attrs = os.popen("lsattr 2>/dev/null").read().split("\n")
+for attr in attrs:
+    if "diarys" in attr:
+        if attr[4] == "i":
+            password = getpass("Please enter your sudo password:")
+            result = os.popen("echo "+password+" | sudo -S chattr -iR diarys").read()
+            print(password)
+        else:
+            if len(argvs) >= 1 and argvs[0] == "--safe":
+                if len(argvs) == 2:
+                    password = argvs[1]
+                else:
+                    password = getpass("Please enter your sudo password:")
+                result = os.popen("echo "+password+" | sudo -S chattr +i -R diarys").read()
+        check = 1
+
+if check == 0:
+    print("No Diarys Folder Found!")

@@ -1,0 +1,13 @@
+--help                          output help infos.
+--date                          specify a date to write.
+--make-list <start> <end>       make a list containing diarys between <start> and <end>.
+--get-list <start> <end>        make a list info about diarys between <start> and <end>.
+--remove-list                   remove list file.
+--protect                       protect diarys from deleting accidently.
+--unprotect                     unprotect diarys from deleting accidently.
+--set-mode safe>/unsafe         set edit mode between safe and unsafe. mode is relevant to "--protect" or "--unprotect".
+--get-mode                      get current mode.
+--update-path <current path>    update path which contains "new" file. Suggest: get <current path> with "$(pwd)" command in the "new" file path.
+--get-path                      get the current path of "new" file.
+--encrypt <date>		encrypt diarys.
+--decrypt <date>		decrypt diarys.

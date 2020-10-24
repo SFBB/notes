@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+from handle_date import is_date, parse_date
+
+
+def remove_undiary(list):
+    first = "000000000"
+    now = os.popen("date +\'%Y%m%d%w\'").read()
+    index = list.copy()
+    for i in index:
+        if is_date(i):
+            if int(i) < int(first) or int(i) > int(now):
+                list.remove(i)
+        else:
+            list.remove(i)
+    return list
+
+def cut(list, point_1, point_2):
+    if point_1 in list:
+        cut_point_1 = list.index(point_1)
+    else:
+        list_temp = list + [point_1]
+        list_temp.sort()
+        cut_point_1 = list_temp.index(point_1)
+
+    if point_2 in list:
+        cut_point_2 = list.index(point_2) + 1
+    else:
+        list_temp = list + [point_2]
+        list_temp.sort()
+        cut_point_2 = list_temp.index(point_2)
+
+    return list[cut_point_1: cut_point_2]
+
+def read_data(filename):
+    file = open(filename, "r")
+    data = file.read()
+    file.close()
+    return data
+
+def write_data(data, filename, type=0):
+    if type == 0:
+        file = open(filename, "a")
+        file.write("\n\n\n\n\n\n" + data)
+    elif type == 1:
+        file = open(filename, "w")
+        file.write(data)
+    file.close()
+
+argvs = sys.argv
+argvs = argvs[1:]
+
+diarys = os.popen("ls diarys").read().split("\n")
+diarys = remove_undiary(diarys)
+
+if len(argvs) == 0:
+    argvs.append("000000000")
+    argvs.append("999999999")
+elif len(argvs) == 1:
+    argvs.insert(0, "000000000")
+    argvs.insert(1, "999999999")
+
+if argvs[0] == "-":
+    argvs[0] = "000000000"
+if argvs[1] == "-":
+    argvs[1] = "999999999"
+diarys.sort()
+diarys = cut(diarys, argvs[0], argvs[1])
+
+if len(argvs) == 3 and argvs[2] == "--get-list":
+    result = ""
+    for diary in diarys:
+        result += diary + " "
+    result = result[:len(result)-1]
+    print(result)
+    exit()
+
+write_data("Date Between "+parse_date(diarys[0])+" And "+parse_date(diarys[len(diarys)-1]), "list", 1)
+for diary in diarys:
+    write_data(read_data("diarys/"+diary), "list")

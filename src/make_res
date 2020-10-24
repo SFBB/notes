@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+
+
+def copy(list, destination):
+    cur = list[0]
+    list = list[1:]
+    for i in list:
+        if i[0] != "/":
+            result = os.popen("cp -ri "+cur+"/"+i+" "+destination).read()
+        else:
+            result = os.popen("cp -ri "+i+" "+destination).read()
+
+def run(list, destination):
+    if list == []:
+        res = os.popen("ls "+destination).read().split("\n")
+        res = res[:len(res)-1]
+        list = res
+    if list == []:
+        exit()
+    else:
+        for i in list:
+            result = os.popen("xdg-open "+destination+"/"+i+" >/dev/null 2>&1 &").read()
+
+if __name__ == "__main__":
+    argvs = sys.argv
+    argvs = argvs[1:]
+    if argvs[0] == "-m":
+        result_1 = os.popen("cd res/"+argvs[1]+" > /dev/null 2>&1; echo $?").read()
+        result_1 = result_1.replace("\n", "")
+        result_2 = os.popen("ls res/"+argvs[1]+" > /dev/null 2>&1; echo $?").read()
+        result_2 = result_2.replace("\n", "")
+        if result_1 == "0" and result_2 == "0":
+            copy(argvs[2:], "res/"+argvs[1])
+        elif result_1 != "0" and result_2 == "0":
+            print("Please decrypt "+argvs[1]+" first!")
+        else:
+            result = os.popen("mkdir -p res/"+argvs[1]).read()
+            copy(argvs[2:], "res/"+argvs[1])
+    if argvs[0] == "-g":
+        result_1 = os.popen("cd res/"+argvs[1]+" > /dev/null 2>&1; echo $?").read()
+        result_1 = result_1.replace("\n", "")
+        result_2 = os.popen("ls res/"+argvs[1]+" > /dev/null 2>&1; echo $?").read()
+        result_2 = result_2.replace("\n", "")
+        if result_1 == "0" and result_2 == "0":
+            run(argvs[2:], "res/"+argvs[1])
+        elif result_1 != "0" and result_2 == "0":
+            print("Please decrypt "+argvs[1]+" first!")
+        else:
+            print("No res for "+argvs[1])
