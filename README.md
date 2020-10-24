@@ -19,8 +19,8 @@ Also, it has many convenient options to help you organize your diaries.
     mkdir .notes
     nano .notes/path
     ```
-And then **type** the path of the `notes` in the `nano` editor.  
-For example, `/home/$USER/Documents/notes` when you put the `notes` app in `/home/$USER/Documents/`.
+    And then **type** the path of the `notes` in the `nano` editor.  
+    For example, `/home/$USER/Documents/notes` when you put the `notes` app in `/home/$USER/Documents/`.
 
 3. Go to the path of `notes`.
 
