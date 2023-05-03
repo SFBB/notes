@@ -75,6 +75,11 @@ shift 1
 ./src/make_edit
 ./src/encrypt_and_decrypt -d $@
 exit
+elif [[ $1 == "--sync" ]]
+then
+shift 1
+./src/sync
+exit
 elif [[ $1 == "--make-res" ]]
 then
 if [[ $2 == "--date" ]]
@@ -123,7 +128,8 @@ $(./../src/handle_date.py $now '%w %m%d %Y')
 EOF
 fi
 
-nano -lmiS$ -T 2 $now
+cd ../
+atom diarys/$now diarys res
 
 cd $cur
 ./src/make_edit --$(cat src/mode) $password

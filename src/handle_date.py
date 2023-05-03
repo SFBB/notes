@@ -5,6 +5,9 @@ import datetime
 import calendar
 
 
+def get_today():
+    return str(datetime.date.today()).replace("-", "")
+
 def find_weekday(date):
     weekday = (datetime.datetime(date[0], date[1], date[2]).weekday() + 1) % 7
     return str(weekday)
@@ -25,10 +28,10 @@ def is_date(string):
         return False
 
 def parse_date(date, format="%Y %m%d %w"):
-    week_day = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-    year = date[0:4]+""
-    month = date[4:6]+"-"
-    day = date[6:8]+""
+    week_day = ["日", "一", "二", "三", "四", "五", "六"]
+    year = date[0:4]+"年"
+    month = date[4:6]+"月"
+    day = date[6:8]+"日"
     format_symbol = ["%Y", "%m", "%d", "%w"]
     weekday = "星期"+week_day[int(date[8])]
     format_content = [year, month, day, weekday]

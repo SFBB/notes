@@ -1,0 +1,221 @@
+#!/usr/bin/env python3
+
+import dropbox
+import os, time
+from fnmatch import fnmatch
+import json
+from handle_date import is_date
+from datetime import timedelta
+
+
+
+def init():
+	dbx = dropbox.Dropbox('')
+	return dbx
+	dbx.users_get_current_account()
+	for entry in dbx.files_list_folder('').entries:
+		print(entry.name)
+	with open("diarys.db", "rb") as file:
+		content = file.read()
+	dbx.files_upload(content, '/diarys.db', mode=dropbox.files.WriteMode.overwrite)
+	# print(dbx.files_get_metadata('/diarys.db').server_modified)
+
+def prepare(dbx):
+	diarys_sync = []
+	others_sync = []
+	metadata, res = dbx.files_download("/metadata.txt")
+	with open("metadata_sync.txt", "wb") as file:
+		file.write(res.content)
+	with open("metadata_sync.txt") as file:
+		metadata_sync = json.load(file)
+	# with open()
+	# for entry in dbx.files_list_folder('', recursive=True).entries:
+	# 	if type(entry) == dropbox.files.FolderMetadata:
+	# 		continue
+	# 	# print(entry.name)
+	# 	if is_date(entry.name):
+	# 		diarys_sync.append(entry.path_display)
+	# 	else:
+	# 		others_sync.append(entry.path_display)
+	# 	# print(type(entry), entry.name, entry.path_display)
+	# # print(diarys_sync)
+	# # print(others_sync)
+
+	# metadata_sync = {"diarys": {}, "others": {}}
+	# for diary in diarys_sync:
+	# 	if diary+".encrypt" in others_sync:
+	# 		others_sync.remove(diary+".encrypt")
+	# 	metadata_sync["diarys"][diary[1:]] = {}
+	# 	metadata_sync["diarys"][diary[1:]]["ctime"] = time.mktime((dbx.files_get_metadata(diary).client_modified+timedelta(hours=8)).timetuple())
+	# 	metadata_sync["diarys"][diary[1:]]["mtime"] = time.mktime((dbx.files_get_metadata(diary).client_modified+timedelta(hours=8)).timetuple())
+	# for other in others_sync:
+	# 	metadata_sync["others"][other[1:]] = {}
+	# 	metadata_sync["others"][other[1:]]["ctime"] = time.mktime((dbx.files_get_metadata(other).client_modified+timedelta(hours=8)).timetuple())
+	# 	metadata_sync["others"][other[1:]]["mtime"] = time.mktime((dbx.files_get_metadata(other).client_modified+timedelta(hours=8)).timetuple())
+
+	# print(metadata_sync)
+
+
+	root = 'diarys'
+	diarys = []
+	others = []
+	# pattern = "*.py"
+
+	for path, subdirs, files in os.walk(root):
+		for name in files:
+			# print(name, is_date(name))
+			if is_date(name):
+				diarys.append(os.path.join(path, name))
+			else:
+				others.append(os.path.join(path, name))
+
+			# if fnmatch(name, pattern):
+			# print(os.path.join(path, name))
+	root = 'res'
+	for path, subdirs, files in os.walk(root):
+		for name in files:
+			# print(name, is_date(name))
+			if is_date(name):
+			# 	diarys.append(os.path.join(path, name))
+			# else:
+				others.append(os.path.join(path, name))
+
+	# diarys = os.listdir('diarys/')
+	# print("diarys/assets" in diarys)
+	metadata = {"diarys": {}, "others": {}}
+	# print(os.path.getctime("diarys.db"))
+	for diary in diarys:
+		if diary+".encrypt" in others:
+			others.remove(diary+".encrypt")
+		else:
+			continue
+		metadata["diarys"][diary] = {}
+		metadata["diarys"][diary]["ctime"] = os.path.getctime(diary)
+		metadata["diarys"][diary]["mtime"] = os.path.getmtime(diary)
+	for other in others:
+		metadata["others"][other] = {}
+		metadata["others"][other]["ctime"] = os.path.getctime(other)
+		metadata["others"][other]["mtime"] = os.path.getmtime(other)
+
+
+	# print(metadata["diarys"]["diarys/202105134"])
+	with open("metadata.txt", "w") as file:
+		json.dump(metadata, file)
+	# # print(metadata)
+	# with open("metadata.txt") as file:
+	# 	data = json.load(file)
+	# print(data["diarys"].keys())
+	# print(data["others"].keys())
+
+	result = {"diarys": {}, "others": {}}
+	for diary in metadata_sync["diarys"].keys():
+		if diary not in metadata["diarys"].keys():
+			result["diarys"][diary] = "db"
+		elif metadata["diarys"][diary]["mtime"] < metadata_sync["diarys"][diary]["mtime"]:
+			result["diarys"][diary] = "db"
+			del metadata["diarys"][diary]
+		elif metadata["diarys"][diary]["mtime"] == metadata_sync["diarys"][diary]["mtime"]:
+			del metadata["diarys"][diary]
+			continue
+		else:
+			result["diarys"][diary] = "local"
+			del metadata["diarys"][diary]
+	for diary in metadata["diarys"].keys():
+		result["diarys"][diary] = "local"
+
+	for other in metadata_sync["others"].keys():
+		if other not in metadata["others"].keys():
+			result["others"][other] = "db"
+		elif metadata["others"][other]["mtime"] < metadata_sync["others"][other]["mtime"]:
+			result["others"][other] = "db"
+			del metadata["others"][other]
+		elif metadata["others"][other]["mtime"] == metadata_sync["others"][other]["mtime"]:
+			del metadata["others"][other]
+			continue
+		else:
+			result["others"][other] = "local"
+			del metadata["others"][other]
+	for other in metadata["others"].keys():
+		result["others"][other] = "local"
+
+	# print(result)
+	# print(metadata["diarys"]["diarys/201908294"])
+	# exit(1)
+	return result
+
+
+
+
+	# for 
+
+	# print("Last modified: %s" % time.ctime(os.path.getmtime("diarys.db")))
+	# print("Created: %s" % time.ctime(os.path.getctime("diarys.db")))
+	# print("Created: %s" % time.ctime(os.path.getatime("diarys.db")))
+
+
+def sync(files):
+	print(files)
+	with open("metadata.txt") as file:
+		metadata = json.load(file)
+	with open("metadata_sync.txt") as file:
+		metadata_sync = json.load(file)
+
+	for diary in files["diarys"].keys():
+		# print(diary)
+		if files["diarys"][diary] == "local":
+			print(diary+"           to upload!")
+			if os.path.isfile(diary+".encrypt"):
+				with open(diary+".encrypt", "rb") as file:
+					content = file.read()
+				dbx.files_upload(content, "/"+diary+".encrypt", mode=dropbox.files.WriteMode.overwrite)
+			with open(diary, "rb") as file:
+				content = file.read()
+			dbx.files_upload(content, "/"+diary, mode=dropbox.files.WriteMode.overwrite)
+		else:
+			print(diary+"           to download!")
+			try:
+				m, res = dbx.files_download("/"+diary+".encrypt")
+				with open(diary+".encrypt", "wb") as file:
+					file.write(res.content)
+				os.utime(diary+".encrypt", (metadata_sync["diarys"][diary]["mtime"], metadata_sync["diarys"][diary]["mtime"]))
+			except:
+				pass
+			# print("aaa")
+			m, res = dbx.files_download("/"+diary)
+			with open(diary, "wb") as file:
+				file.write(res.content)
+			os.utime(diary, (metadata_sync["diarys"][diary]["mtime"], metadata_sync["diarys"][diary]["mtime"]))
+			metadata["diarys"][diary] = metadata_sync["diarys"][diary]
+
+	for other in files["others"].keys():
+		if files["others"][other] == "local":
+			print(other+"           to upload!")
+			with open(other, "rb") as file:
+				content = file.read()
+			dbx.files_upload(content, "/"+other, mode=dropbox.files.WriteMode.overwrite)
+		else:
+			print(other+"           to download!")
+			m, res = dbx.files_download("/"+other)
+			with open(other, "wb") as file:
+				file.write(res.content)
+			os.utime(other, (metadata_sync["others"][other]["mtime"], metadata_sync["others"][other]["mtime"]))
+			metadata["others"][other] = metadata_sync["others"][other]
+
+	with open("metadata.txt", "w") as file:
+		json.dump(metadata, file)
+	with open("metadata_sync.txt", "w") as file:
+		json.dump(metadata, file)
+
+	with open("metadata_sync.txt", "rb") as file:
+		content = file.read()
+	dbx.files_upload(content, "/metadata.txt", mode=dropbox.files.WriteMode.overwrite)
+	print("Completed!")
+
+
+
+
+if __name__ == "__main__":
+	# print("Hello World!")
+	dbx = init()
+	files = prepare(dbx)
+	sync(files)

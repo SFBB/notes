@@ -2,17 +2,70 @@
 
 import Crypto
 from Crypto.PublicKey import RSA
+from Crypto.Cipher import AES
 from Crypto import Random
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES, PKCS1_OAEP
 import ast
 import base64
+import hashlib
 import os
 import sys
-from handle_date import is_date, find_weekday, parse_date
+from getpass import getpass
+from handle_date import is_date, find_weekday, parse_date, get_today
 
+
+def encrypt_key():
+    password = getpass()
+    password = password.encode("utf-8")
+    password = hashlib.sha256(password).digest()
+    # print(password)
+    cipher = AES.new(password, AES.MODE_EAX)
+    nonce = cipher.nonce
+    # print(nonce, len(nonce))
+    with open("src/secret_key", "rb") as file:
+        data = file.read()
+    ciphertext, tag = cipher.encrypt_and_digest(data)
+    # print(tag, len(tag))
+    all = bytes(0)
+    all += nonce
+    all += ciphertext
+    all += tag
+    all = base64.b64encode(all)
+    
+    with open("src/secret_key", "wb") as file:
+        file.write(all)
+    print("Done!")
+
+def decrypt_key():
+    password = getpass()
+    password = password.encode("utf-8")
+    password = hashlib.sha256(password).digest()
+    with open("src/secret_key", "rb") as file:
+        data = file.read()
+    ciphertext = base64.b64decode(data)
+    nonce = ciphertext[:16]
+    ciphertext = ciphertext[16:]
+    tag = ciphertext[len(ciphertext)-16:]
+    # print(nonce, len(nonce))
+    # print(tag, len(tag))
+    ciphertext = ciphertext[:len(ciphertext)-16]
+    cipher = AES.new(password, AES.MODE_EAX, nonce=nonce)
+    # plaintext = cipher.decrypt(ciphertext)
+    # print(plaintext)
+
+    try:
+        plaintext = cipher.decrypt(ciphertext)
+        cipher.verify(tag)
+        # print(plaintext)
+        return plaintext
+    except ValueError as e:
+        print(e)
+        # print("Key incorrect or message corrupted!")
 
 def auto_complete_date(date):
+    if date == "today":
+        date = get_today()
     if len(date) == 8:
         return date + find_weekday([int(date[:4]), int(date[4:6]), int(date[6:8])])
     return date
@@ -114,14 +167,17 @@ def generate_and_save_key():
     return "secret_key", "public_key"
 
 def get_key(filename):
-    try:
-        key_file = open(filename, "rb")
-    except:
-        print("No Key!")
-        exit()
-    key_info = key_file.read()
-    key_file.close()
-    key = RSA.importKey(key_info)
+    if "secret" not in filename:
+        try:
+            key_file = open(filename, "rb")
+            key_info = key_file.read()
+            key_file.close()
+        except:
+            print("No Key!")
+            exit()
+    else:
+        key_info = decrypt_key()
+    key = RSA.importKey(key_info)        
     return key
 
 def encrypt(content, key, type=0):
@@ -165,6 +221,9 @@ def decrypt(content, key, type=0):
         return result
 
 if __name__ == "__main__":
+    # encrypt_key()
+    # decrypt_key()
+    # exit(0)
     argvs = sys.argv
     argvs = argvs[1:]
     if len(argvs) == 1:
@@ -193,6 +252,7 @@ if __name__ == "__main__":
                         write_data(encrypted_data, "res/"+argv, 2)
     elif argvs[0] == "-d":
         argvs = argvs[1:]
+        key = get_key("src/secret_key")
         for argv in argvs:
             argv = auto_complete_date(argv)
             result_1 = os.popen("ls diarys/"+argv+".encrypt > /dev/null 2>&1 ; echo $?").read()
@@ -200,14 +260,14 @@ if __name__ == "__main__":
             result_2 = os.popen("ls diarys/"+argv+" > /dev/null 2>&1 ; echo $?").read()
             result_2 = result_2.replace("\n", "", result_2.count("\n"))
             if result_1 == "0" and result_2 == "0":
-                decrypted_data = decrypt(read_data("diarys/"+argv, 1), get_key("src/secret_key"))
+                decrypted_data = decrypt(read_data("diarys/"+argv, 1), key)
                 write_data(decrypted_data, "diarys/"+argv)
                 result_1 = os.popen("cd res/"+argv+" > /dev/null 2>&1 ; echo $?").read()
                 result_1 = result_1.replace("\n", "", result_1.count("\n"))
                 result_2 = os.popen("ls res/"+argv+" > /dev/null 2>&1 ; echo $?").read()
                 result_2 = result_2.replace("\n", "", result_2.count("\n"))
                 if result_1 != "0" and result_2 == "0":
-                    decrypted_data = decrypt(read_data("res/"+argv, 2), get_key("src/secret_key"), 2)
+                    decrypted_data = decrypt(read_data("res/"+argv, 2), key, 2)
                     write_data(decrypted_data, "res/"+argv+".tar.gz", 3)
                     result = os.popen("rm res/"+argv).read()
                     result = os.popen("cd res && tar -xvf "+argv+".tar.gz && rm "+argv+".tar.gz").read()
